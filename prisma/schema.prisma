@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentStatus {
+  uploaded
+  processing
+  extracted
+  needs_review
+  approved
+  rejected
+  failed
+}
+
+enum ApplicationStatus {
+  draft
+  submitted
+  in_review
+  approved
+  rejected
+}
+
+enum AuthorityDecision {
+  approved
+  rejected
+  pending
+}
+
+model User {
+  id             String          @id @default(cuid())
+  email          String          @unique
+  name           String?
+  role           String          @default("USER")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  documents      Document[]
+  applications   Application[]
+  consentRecords ConsentRecord[]
+}
+
+model Document {
+  id               String          @id @default(cuid())
+  userId           String
+  user             User            @relation(fields: [userId], references: [id])
+  applicationId    String?
+  application      Application?    @relation(fields: [applicationId], references: [id])
+  fileName         String
+  storagePath      String
+  mimeType         String
+  sizeBytes        Int
+  status           DocumentStatus  @default(uploaded)
+  ocrText          String?
+  ocrWarnings      String[]        @default([])
+  extractionJson   Json?
+  reviewData       Json?
+  errorMessage     String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  extractionResult ExtractionResult?
+  consentRecord    ConsentRecord?
+  history          ApplicationHistory[]
+}
+
+model ExtractionResult {
+  id             String   @id @default(cuid())
+  documentId     String   @unique
+  document       Document @relation(fields: [documentId], references: [id])
+  serviceType    String?
+  extractedData Json
+  warnings       String[] @default([])
+  reviewRequired String[] @default([])
+  confidenceScore Float?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Application {
+  id             String            @id @default(cuid())
+  userId         String
+  user           User              @relation(fields: [userId], references: [id])
+  serviceType    String
+  status         ApplicationStatus @default(draft)
+  idempotencyKey String?           @unique
+  submittedAt    DateTime?
+  reviewedData   Json?
+  authorityNotes String?
+  decision       AuthorityDecision? @default(pending)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  documents Document[]
+  history   ApplicationHistory[]
+}
+
+model ApplicationHistory {
+  id            String    @id @default(cuid())
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+  documentId    String?
+  document      Document?  @relation(fields: [documentId], references: [id])
+  actorType     String
+  actorId       String?
+  eventType     String
+  notes         String?
+  createdAt     DateTime  @default(now())
+}
+
+model ConsentRecord {
+  id              String   @id @default(cuid())
+  documentId      String   @unique
+  document        Document @relation(fields: [documentId], references: [id])
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  consentGiven    Boolean
+  purpose         String
+  retentionPolicy String
+  createdAt       DateTime @default(now())
+}

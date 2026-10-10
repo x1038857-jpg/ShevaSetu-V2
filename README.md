@@ -1,49 +1,62 @@
-# Sheva-Setu
+# Sheva-Setu Document Extraction Module
 
-A production-ready full-stack government services portal built with Next.js, Supabase, and AI-powered document reading.
+This project adds a production-oriented document-processing workflow for government services:
 
-## Features
-- Two portals: Citizen/User and Government, each with its own registration and login
-- Registration: name + email -> OTP verification -> set password -> success -> login
-- Role-based redirect after login (users open the citizen dashboard, officers open the officer dashboard)
-- Supabase auth integration
-- AI document authenticity checks
-- Auto-fill user forms from uploaded documents
-- Hindi + English bilingual support
-- Government officer dashboard with approval/rejection workflow
-- Application tracking and document review
+Document Upload -> OCR -> AI Extraction -> User Review -> Consent -> Database Save -> Authority Verification
 
-## Tech stack
-- Next.js 14
+## Stack
+
+- Next.js App Router
 - TypeScript
-- Tailwind CSS
-- Supabase
-- OpenAI
+- Supabase Auth + private storage
+- Prisma + PostgreSQL
+- OpenAI structured extraction
+- OCR for scanned PDFs and images
+- Zod validation
 
-## Quick start
-1. Copy `.env.example` to `.env.local`
-2. Fill in your Supabase and OpenAI keys
-3. Run: `npm install`
-4. Start app: `npm run dev`
+## Environment variables
 
-## Portal pages
-- Citizen: Home, Services, My Applications, Government Portal, About (English / हिंदी toggle in the header)
-- Government: Dashboard (stats + approval panel with Pending / In Process / Approved / Rejected) and About
+Copy `.env.example` to `.env.local` and fill values:
 
-## Supabase setup
-1. Apply the SQL from `supabase/schema.sql` in your Supabase SQL editor.
-   (Already applied an older version? Run `supabase/patch-auth-roles.sql`, then `supabase/patch-portal-upgrade.sql`.)
-2. **OTP emails:** go to Authentication -> Email Templates and make sure both the **Confirm signup**
-   and **Magic Link** templates show the code with `{{ .Token }}`, for example:
-   `<h2>Your Sheva-Setu OTP</h2><p>{{ .Token }}</p>`
-3. Supabase's built-in email sender has a very low hourly limit. For real use, add your own SMTP
-   under Authentication -> SMTP Settings.
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_JWT_SECRET=
+OPENAI_API_KEY=
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+GOVERNMENT_EMAIL_DOMAINS=gov.in,nic.in
+DATABASE_URL=postgresql://user:password@localhost:5432/sheva_setu
+MAX_UPLOAD_SIZE_MB=10
+DOCUMENT_RETENTION_DAYS=90
+LOG_LEVEL=info
+```
 
-## Government accounts
-Government registration only accepts official email domains, set in `GOVERNMENT_EMAIL_DOMAINS`
-(default `gov.in,nic.in`; subdomains such as `mp.gov.in` are included). For local testing you can
-temporarily add your own domain, e.g. `GOVERNMENT_EMAIL_DOMAINS=gov.in,nic.in,gmail.com`.
-Remove test domains before going live, otherwise anyone could register as an officer.
+## Setup
 
-## Notes
-This project is designed to work with real Supabase and OpenAI credentials. Without them, the app still loads and can run in demo mode for local UI testing.
+```bash
+npm install
+npx prisma generate
+npx prisma migrate dev --name init
+npm run dev
+```
+
+## Required API routes
+
+- POST /api/documents/upload
+- GET /api/documents/[id]
+- POST /api/documents/[id]/extract
+- PATCH /api/documents/[id]/review
+- POST /api/applications/[id]/submit
+- GET /api/authority/applications
+- PATCH /api/authority/applications/[id]/decision
+
+## Important rules
+
+- Validate file type, MIME type, signature and size on the server.
+- Reject unsupported, corrupted or empty files.
+- OCR must be derived from actual file content.
+- AI extraction must return structured JSON with null for missing values.
+- User confirmation is required before submission.
+- Authority review must remain manual and auditable.
+- Never treat AI extraction as proof of authenticity.
